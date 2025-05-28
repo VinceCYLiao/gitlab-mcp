@@ -134,6 +134,8 @@ import {
   type GetRepositoryTreeOptions,
   UpdateIssueNoteSchema,
   CreateIssueNoteSchema,
+  GitLabMilestonesSchema,
+  ListProjectIssuesByMilestoneIidSchema,
 } from "./schemas.js";
 
 /**
@@ -466,6 +468,11 @@ const allTools = [
     description: "Get the output/trace of a GitLab pipeline job number",
     inputSchema: zodToJsonSchema(GetPipelineJobOutputSchema),
   },
+  {
+    name: "list_issues_by_milestone_iid",
+    description: "List issues in a GitLab within a specific milestone",
+    inputSchema: zodToJsonSchema(ListProjectIssuesByMilestoneIidSchema),
+  },
 ];
 
 // Define which tools are read-only
@@ -494,6 +501,7 @@ const readOnlyTools = [
   "get_label",
   "list_group_projects",
   "get_repository_tree",
+  "list_milestones",
 ];
 
 // Define which tools are related to wiki and can be toggled by USE_GITLAB_WIKI
@@ -2544,6 +2552,36 @@ async function getRepositoryTree(
   return z.array(GitLabTreeItemSchema).parse(data);
 }
 
+/**
+ * List issues by milestone IID in a GitLab project
+ * @param {string} projectId - The ID or URL-encoded path of the project
+ * @param {Object} options - Options for listing issues and milestone iid
+ * @returns {Promise<GitLabIssue[]>} List of issues
+ */
+async function listIssuesByMilestoneIid(
+  projectId: string,
+  options: Omit<z.infer<typeof ListProjectIssuesByMilestoneIidSchema>, "project_id">
+): Promise<GitLabIssue[]> {
+  projectId = decodeURIComponent(projectId); 
+  const { milestone_iid, ...issue_options } = options;
+  const milestones_url = new URL(
+    `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/milestones?iids[]=${milestone_iid}`
+  );
+
+  const milestones_response = await fetch(milestones_url.toString(), {
+    ...DEFAULT_FETCH_CONFIG,
+  });
+  await handleGitLabError(milestones_response);
+  const milestones_data = await milestones_response.json();
+  const milestones = z.array(GitLabMilestonesSchema).parse(milestones_data);
+  const milestone = milestones[0]?.title;
+
+  return listIssues(projectId, {
+    ...issue_options,
+    milestone,
+  });
+}
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   // Apply read-only filter first
   const tools0 = GITLAB_READ_ONLY_MODE
@@ -3295,6 +3333,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: "text",
               text: jobOutput,
+            },
+          ],
+        };
+      }
+
+      case "list_issues_by_milestone_iid": {
+        const { project_id, ...options } = ListProjectIssuesByMilestoneIidSchema.parse(
+          request.params.arguments
+        );
+        const issues = await listIssuesByMilestoneIid(project_id, options);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(issues, null, 2),
             },
           ],
         };

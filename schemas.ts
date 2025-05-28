@@ -333,6 +333,21 @@ export const GitLabReferenceSchema = z.object({
   }),
 });
 
+// Milestones rest api output schemas
+export const GitLabMilestonesSchema = z.object({
+  id: z.number(),
+  iid: z.number(),
+  project_id: z.number(),
+  title: z.string(),
+  description: z.string().nullable(),
+  due_date: z.string().nullable(),
+  start_date: z.string().nullable(),
+  state: z.string(),
+  updated_at: z.string(),
+  created_at: z.string(),
+  expired: z.boolean()
+});
+
 // Input schemas for operations
 export const CreateRepositoryOptionsSchema = z.object({
   name: z.string(),
@@ -1178,6 +1193,12 @@ export const CreateMergeRequestThreadSchema = ProjectParamsSchema.extend({
   created_at: z.string().optional().describe("Date the thread was created at (ISO 8601 format)"),
 });
 
+// Schema for listing issues by milestone IID
+export const ListProjectIssuesByMilestoneIidSchema = ListIssuesSchema.extend({
+  milestone_iid: z.number().describe("The IID of a project milestone"),
+});
+
+
 // Export types
 export type GitLabAuthor = z.infer<typeof GitLabAuthorSchema>;
 export type GitLabFork = z.infer<typeof GitLabForkSchema>;
@@ -1238,3 +1259,4 @@ export type GitLabPipeline = z.infer<typeof GitLabPipelineSchema>;
 export type ListPipelinesOptions = z.infer<typeof ListPipelinesSchema>;
 export type GetPipelineOptions = z.infer<typeof GetPipelineSchema>;
 export type ListPipelineJobsOptions = z.infer<typeof ListPipelineJobsSchema>;
+export type GitLabMilestones = z.infer<typeof GitLabMilestonesSchema>;
